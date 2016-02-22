@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:tx="http://www.springframework.org/schema/tx"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+                        http://www.springframework.org/schema/beans/spring-beans.xsd 
+                        http://www.springframework.org/schema/tx 
+                        http://www.springframework.org/schema/tx/spring-tx.xsd
+                        http://www.springframework.org/schema/context 
+                        http://www.springframework.org/schema/context/spring-context.xsd">
+
+    <context:component-scan base-package="com.cnblogs.yjmyzz.sharding"/>
+
+    <bean id="propertiesFactoryBean"
+          class="org.springframework.beans.factory.config.PropertiesFactoryBean">
+        <property name="locations">
+            <list>
+                <value>classpath:properties/jdbc.properties</value>
+            </list>
+        </property>
+    </bean>
+
+    <context:property-placeholder properties-ref="propertiesFactoryBean" ignore-unresolvable="true"/>
+
+
+    <!--<bean id="parentDataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">-->
+        <!--<property name="driverClassName" value="${jdbc-driver}"/>-->
+        <!--<property name="url" value="${jdbc-url-0}"/>-->
+        <!--<property name="username" value="${jdbc-user-0}"/>-->
+        <!--<property name="password" value="${jdbc-password-0}"/>-->
+    <!--</bean>-->
+
+    <!--父数据源-->
+    <!--<bean id="parentDataSource" class="com.alibaba.druid.pool.DruidDataSource" init-method="init"-->
+          <!--destroy-method="close">-->
+        <!--<property name="driverClassName" value="${jdbc-driver}"/>-->
+        <!--<property name="url" value="${jdbc-url-0}"/>-->
+        <!--<property name="username" value="${jdbc-user-0}"/>-->
+        <!--<property name="password" value="${jdbc-password-0}"/>-->
+        <!--<property name="filters" value="stat"/>-->
+        <!--<property name="maxActive" value="20"/>-->
+        <!--<property name="initialSize" value="1"/>-->
+        <!--<property name="maxWait" value="60000"/>-->
+        <!--<property name="minIdle" value="1"/>-->
+        <!--<property name="timeBetweenEvictionRunsMillis" value="3000"/>-->
+        <!--<property name="minEvictableIdleTimeMillis" value="300000"/>-->
+        <!--<property name="validationQuery" value="SELECT 'x'"/>-->
+        <!--<property name="testWhileIdle" value="true"/>-->
+        <!--<property name="testOnBorrow" value="false"/>-->
+        <!--<property name="testOnReturn" value="false"/>-->
+        <!--<property name="poolPreparedStatements" value="true"/>-->
+        <!--<property name="maxPoolPreparedStatementPerConnectionSize" value="20"/>-->
+        <!--<property name="connectionInitSqls" value="set names utf8mb4;"/>-->
+    <!--</bean>-->
+
+    <!--数据源0-->
+    <!--<bean id="ds_1" parent="parentDataSource">-->
+    <bean id="ds_0" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+        <property name="driverClassName" value="${jdbc-driver}"/>
+        <property name="url" value="${jdbc-url-0}"/>
+        <property name="username" value="${jdbc-user-0}"/>
+        <property name="password" value="${jdbc-password-0}"/>
+    </bean>
+
+    <!--数据源1-->
+    <bean id="ds_1" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+        <property name="driverClassName" value="${jdbc-driver}"/>
+        <property name="url" value="${jdbc-url-1}"/>
+        <property name="username" value="${jdbc-user-1}"/>
+        <property name="password" value="${jdbc-password-1}"/>
+    </bean>
+
+    <!--数据源2-->
+    <bean id="ds_2" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+        <property name="driverClassName" value="${jdbc-driver}"/>
+        <property name="url" value="${jdbc-url-2}"/>
+        <property name="username" value="${jdbc-user-2}"/>
+        <property name="password" value="${jdbc-password-2}"/>
+    </bean>
+
+    <!--真正使用的数据源-->
+    <bean id="dataSource" class="com.dangdang.ddframe.rdb.sharding.api.rule.DataSourceRule">
+        <constructor-arg>
+            <map>
+                <entry key="ds_0" value-ref="ds_0"/>
+                <entry key="ds_1" value-ref="ds_1"/>
+                <entry key="ds_2" value-ref="ds_2"/>
+            </map>
+        </constructor-arg>
+    </bean>
+
+    <!--t_order的"分表"设置:分N个表 -->
+    <bean id="orderTableRule" class="com.dangdang.ddframe.rdb.sharding.api.rule.TableRule">
+        <constructor-arg value="t_order" index="0"/>
+        <constructor-arg index="1">
+            <list>
+                <value>t_order_0</value>
+                <value>t_order_1</value>
+            </list>
+        </constructor-arg>
+        <constructor-arg index="2" ref="dataSource"/>
+    </bean>
+
+    <!--分库的sharding规则:按user_id分库 -->
+    <bean id="databaseShardingStrategy"
+          class="com.dangdang.ddframe.rdb.sharding.api.strategy.database.DatabaseShardingStrategy">
+        <constructor-arg index="0" value="user_id"/>
+        <constructor-arg index="1">
+            <bean class="com.huijiame.utils.sharding.jdbc.SingleKeyModuloDatabaseShardingAlgorithm">
+                <!--dbount的值要跟上面dataSource的个数匹配-->
+                <property name="dbCount" value="3"/>
+            </bean>
+        </constructor-arg>
+    </bean>
+
+
+    <bean id="singleKeyModuloTableShardingAlgorithm" class="com.huijiame.utils.sharding.jdbc.SingleKeyModuloTableShardingAlgorithm">
+        <!--tableCount的值要跟上面t_order表设置的分表个数保持一致-->
+        <property name="tableCount" value="2"/>
+    </bean>
+
+    <!--分表的规则:按order_id分表-->
+    <bean id="tableShardingStrategy" class="com.dangdang.ddframe.rdb.sharding.api.strategy.table.TableShardingStrategy">
+        <constructor-arg index="0" value="order_id"/>
+        <constructor-arg index="1" ref="singleKeyModuloTableShardingAlgorithm" />
+    </bean>
+
+    <!--sharding规则Bean-->
+    <bean id="shardingRule" class="com.dangdang.ddframe.rdb.sharding.api.rule.ShardingRule">
+        <constructor-arg index="0" ref="dataSource"/>
+        <constructor-arg index="1">
+            <list>
+                <ref bean="orderTableRule"/>
+            </list>
+        </constructor-arg>
+        <constructor-arg index="2" ref="databaseShardingStrategy"/>
+        <constructor-arg index="3" ref="tableShardingStrategy"/>
+    </bean>
+
+    <!--sharding数据源-->
+    <bean id="shardingDataSource" class="com.dangdang.ddframe.rdb.sharding.api.ShardingDataSource">
+        <constructor-arg ref="shardingRule"/>
+    </bean>
+
+    <!--sharding事务管理器-->
+    <!--<bean id="transactionManager"-->
+          <!--class="org.springframework.jdbc.datasource.DataSourceTransactionManager">-->
+        <!--<property name="dataSource" ref="shardingDataSource"/>-->
+    <!--</bean>-->
+
+    <!--<tx:annotation-driven transaction-manager="transactionManager"/>-->
+
+    <!--mybatis配置-->
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+        <property name="configLocation" value="classpath:mybatis-config.xml"></property>
+        <property name="dataSource" ref="shardingDataSource"/>
+        <property name="mapperLocations" value="classpath:mybatis/OrderMapper.xml"/>
+    </bean>
+
+    <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <property name="basePackage" value="com.cnblogs.yjmyzz.sharding.mapper"/>
+        <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"/>
+    </bean>
+
+</beans>
