@@ -1,4 +1,4 @@
-### 当当sharding-jdbc的代码示例
+### 当当[sharding-jdbc](https://github.com/dangdangdotcom/sharding-jdbc)的代码示例
 
 ---
 
